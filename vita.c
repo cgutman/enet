@@ -383,6 +383,9 @@ enet_socket_send (ENetSocket socket,
         if (sentLength == SCE_NET_ERROR_EWOULDBLOCK)
             return 0;
 
+        sceClibPrintf("enet_socket_send failed! socket 0x%x error 0x%x\n", socket, sentLength);
+        sceClibPrintf("tried to send buffers 0x%x bufferCount %d\n", buffers, bufferCount);
+
         return -1;
     }
 
@@ -415,6 +418,8 @@ enet_socket_receive (ENetSocket socket,
     if (recvLength < 0) {
         if (recvLength == SCE_NET_ERROR_EWOULDBLOCK)
             return 0;
+
+        sceClibPrintf("enet_socket_receive failed! socket 0x%x recvLength 0x%x\n", socket, recvLength);
 
         return -1;
     }

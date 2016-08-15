@@ -5,9 +5,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#ifdef MSG_MAXIOVLEN
-#define ENET_BUFFER_MAXIMUM MSG_MAXIOVLEN
-#endif
+#define ENET_BUFFER_MAXIMUM 10
 
 typedef int ENetSocket;
 
