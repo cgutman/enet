@@ -12,10 +12,10 @@ extern "C"
 
 #include <stdlib.h>
 
-#if defined(__vita__)
-#include "enet/vita.h"
-#elif defined(_WIN32)
+#ifdef _WIN32
 #include "enet/win32.h"
+#elif defined(__vita__)
+#include "enet/vita.h"
 #else
 #include "enet/unix.h"
 #endif
@@ -398,7 +398,7 @@ typedef enum _ENetEventType
    ENET_EVENT_TYPE_CONNECT    = 1,  
 
    /** a peer has disconnected.  This event is generated on a successful 
-     * completion of a disconnect initiated by enet_pper_disconnect, if 
+     * completion of a disconnect initiated by enet_peer_disconnect, if 
      * a peer has timed out, or if a connection request intialized by 
      * enet_host_connect has timed out.  The peer field contains the peer 
      * which disconnected. The data field contains user supplied data 

@@ -34,4 +34,18 @@ typedef fd_set ENetSocketSet;
 #define ENET_SOCKETSET_ADD(sockset, socket)    FD_SET (socket, & (sockset))
 #define ENET_SOCKETSET_REMOVE(sockset, socket) FD_CLR (socket, & (sockset))
 #define ENET_SOCKETSET_CHECK(sockset, socket)  FD_ISSET (socket, & (sockset))
-    
+
+#define __ss_aligntype  unsigned long int
+#define _SS_SIZE        128
+#define _SS_PADSIZE     (_SS_SIZE - (2 * sizeof (__ss_aligntype)))
+
+#define __SOCKADDR_COMMON(sa_prefix) \
+  unsigned char sa_prefix##len;      \
+  sa_family_t sa_prefix##family
+
+struct sockaddr_storage
+{
+    __SOCKADDR_COMMON (ss_);    /* Address family, etc.  */
+    __ss_aligntype __ss_align;  /* Force desired alignment.  */
+    char __ss_padding[_SS_PADSIZE];
+};
