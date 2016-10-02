@@ -9,10 +9,6 @@
 #include "enet/time.h"
 #include "enet/enet.h"
 
-#ifdef __vita__
-  #define perror sceClibPrintf
-#endif
-
 static size_t commandSizes [ENET_PROTOCOL_COMMAND_COUNT] =
 {
     0,
@@ -1910,3 +1906,4 @@ enet_host_service (ENetHost * host, ENetEvent * event, enet_uint32 timeout)
 
     return 0; 
 }
+

@@ -49,3 +49,5 @@ struct sockaddr_storage
     __ss_aligntype __ss_align;  /* Force desired alignment.  */
     char __ss_padding[_SS_PADSIZE];
 };
+
+#define perror sceClibPrintf
