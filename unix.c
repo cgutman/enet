@@ -7,7 +7,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/select.h>
-#include <sys/ioctl.h>
 #include <sys/time.h>
 #include <arpa/inet.h>
 #include <netinet/tcp.h>
@@ -47,8 +46,42 @@
 #endif
 #endif
 
+#ifdef __vita__
+#ifdef HAS_POLL
+#undef HAS_POLL
+#endif
+#ifdef HAS_FCNTL
+#undef HAS_FCNTL
+#endif
+#ifdef HAS_IOCTL
+#undef HAS_IOCTL
+#endif
+#ifndef HAS_INET_PTON
+#define HAS_INET_PTON 1
+#endif
+#ifndef HAS_INET_NTOP
+#define HAS_INET_NTOP 1
+#endif
+#ifdef HAS_MSGHDR_FLAGS
+#undef HAS_MSGHDR_FLAGS
+#endif
+#ifndef HAS_SOCKLEN_T
+#define HAS_SOCKLEN_T 1
+#endif
+#ifndef HAS_GETADDRINFO
+#define HAS_GETADDRINFO 1
+#endif
+#ifndef HAS_GETNAMEINFO
+#define HAS_GETNAMEINFO 1
+#endif
+#endif
+
 #ifdef HAS_FCNTL
 #include <fcntl.h>
+#endif
+
+#ifdef HAS_IOCTL
+#include <sys/ioctl.h>
 #endif
 
 #ifdef HAS_POLL
@@ -57,6 +90,10 @@
 
 #ifndef HAS_SOCKLEN_T
 typedef int socklen_t;
+#endif
+
+#ifndef SOMAXCONN
+#define SOMAXCONN 128
 #endif
 
 #ifndef MSG_NOSIGNAL
@@ -232,13 +269,18 @@ int
 enet_socket_set_option (ENetSocket socket, ENetSocketOption option, int value)
 {
     int result = -1;
+    int _true = 1;
     switch (option)
     {
         case ENET_SOCKOPT_NONBLOCK:
 #ifdef HAS_FCNTL
             result = fcntl (socket, F_SETFL, (value ? O_NONBLOCK : 0) | (fcntl (socket, F_GETFL) & ~O_NONBLOCK));
 #else
+#ifdef HAS_IOCTL
             result = ioctl (socket, FIONBIO, & value);
+#else
+            result = setsockopt (socket, SOL_SOCKET, SO_NONBLOCK, (char * ) & _true, sizeof(int));
+#endif
 #endif
             break;
 
