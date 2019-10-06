@@ -269,7 +269,6 @@ int
 enet_socket_set_option (ENetSocket socket, ENetSocketOption option, int value)
 {
     int result = -1;
-    int _true = 1;
     switch (option)
     {
         case ENET_SOCKOPT_NONBLOCK:
@@ -279,7 +278,7 @@ enet_socket_set_option (ENetSocket socket, ENetSocketOption option, int value)
 #ifdef HAS_IOCTL
             result = ioctl (socket, FIONBIO, & value);
 #else
-            result = setsockopt (socket, SOL_SOCKET, SO_NONBLOCK, (char * ) & _true, sizeof(int));
+            result = setsockopt (socket, SOL_SOCKET, SO_NONBLOCK, (char *) & value, sizeof(int));
 #endif
 #endif
             break;
