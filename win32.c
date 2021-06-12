@@ -15,6 +15,12 @@ static HANDLE qosHandle = INVALID_HANDLE_VALUE;
 static QOS_FLOWID qosFlowId;
 static BOOL qosAddedFlow;
 
+static HMODULE QwaveLibraryHandle;
+
+BOOL (WINAPI *pfnQOSCreateHandle)(PQOS_VERSION Version, PHANDLE QOSHandle);
+BOOL (WINAPI *pfnQOSCloseHandle)(HANDLE QOSHandle);
+BOOL (WINAPI *pfnQOSAddSocketToFlow)(HANDLE QOSHandle, SOCKET Socket, PSOCKADDR DestAddr, QOS_TRAFFIC_TYPE TrafficType, DWORD Flags, PQOS_FLOWID FlowId);
+
 int
 enet_initialize (void)
 {
@@ -34,6 +40,22 @@ enet_initialize (void)
 
     timeBeginPeriod (1);
 
+    QwaveLibraryHandle = LoadLibraryA("qwave.dll");
+    if (QwaveLibraryHandle != NULL) {
+        pfnQOSCreateHandle = (void*)GetProcAddress(QwaveLibraryHandle, "QOSCreateHandle");
+        pfnQOSCloseHandle = (void*)GetProcAddress(QwaveLibraryHandle, "QOSCloseHandle");
+        pfnQOSAddSocketToFlow = (void*)GetProcAddress(QwaveLibraryHandle, "QOSAddSocketToFlow");
+
+        if (pfnQOSCreateHandle == NULL || pfnQOSCloseHandle == NULL || pfnQOSAddSocketToFlow == NULL) {
+            pfnQOSCreateHandle = NULL;
+            pfnQOSCloseHandle = NULL;
+            pfnQOSAddSocketToFlow = NULL;
+
+            FreeLibrary(QwaveLibraryHandle);
+            QwaveLibraryHandle = NULL;
+        }
+    }
+
     return 0;
 }
 
@@ -45,8 +67,17 @@ enet_deinitialize (void)
 
     if (qosHandle != INVALID_HANDLE_VALUE)
     {
-        QOSCloseHandle(qosHandle);
+        pfnQOSCloseHandle(qosHandle);
         qosHandle = INVALID_HANDLE_VALUE;
+    }
+
+    if (QwaveLibraryHandle != NULL) {
+        pfnQOSCreateHandle = NULL;
+        pfnQOSCloseHandle = NULL;
+        pfnQOSAddSocketToFlow = NULL;
+
+        FreeLibrary(QwaveLibraryHandle);
+        QwaveLibraryHandle = NULL;
     }
 
     timeEndPeriod (1);
@@ -239,14 +270,14 @@ enet_socket_set_option (ENetSocket socket, ENetSocketOption option, int value)
 
                 qosVersion.MajorVersion = 1;
                 qosVersion.MinorVersion = 0;
-                if (!QOSCreateHandle(&qosVersion, &qosHandle))
+                if (pfnQOSCreateHandle == NULL || !pfnQOSCreateHandle(&qosVersion, &qosHandle))
                 {
                     qosHandle = INVALID_HANDLE_VALUE;
                 }
             }
             else if (qosHandle != INVALID_HANDLE_VALUE)
             {
-                QOSCloseHandle(qosHandle);
+                pfnQOSCloseHandle(qosHandle);
                 qosHandle = INVALID_HANDLE_VALUE;
             }
 
@@ -334,12 +365,12 @@ enet_socket_send (ENetSocket socket,
     if (!qosAddedFlow && qosHandle != INVALID_HANDLE_VALUE)
     {
         qosFlowId = 0; // Must be initialized to 0
-        QOSAddSocketToFlow(qosHandle,
-                           socket,
-                           (struct sockaddr *)&address->address,
-                           QOSTrafficTypeControl,
-                           QOS_NON_ADAPTIVE_FLOW,
-                           &qosFlowId);
+        pfnQOSAddSocketToFlow(qosHandle,
+                              socket,
+                              (struct sockaddr *)&address->address,
+                              QOSTrafficTypeControl,
+                              QOS_NON_ADAPTIVE_FLOW,
+                              &qosFlowId);
 
         // Even if we failed, don't try again
         qosAddedFlow = TRUE;
