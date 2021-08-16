@@ -11,6 +11,26 @@
 #include <qos2.h>
 
 static enet_uint32 timeBase = 0;
+
+#if defined(WINAPI_FAMILY) && WINAPI_FAMILY == WINAPI_FAMILY_APP
+# define ON_UWP
+#endif
+
+#ifdef ON_UWP
+void timeBeginPeriod(int t) {
+
+}
+void timeEndPeriod(int t) {
+
+}
+
+enet_uint32 timeGetTime()
+{
+    return GetTickCount64();
+}
+
+#else 
+
 static HANDLE qosHandle = INVALID_HANDLE_VALUE;
 static QOS_FLOWID qosFlowId;
 static BOOL qosAddedFlow;
@@ -20,6 +40,8 @@ static HMODULE QwaveLibraryHandle;
 BOOL (WINAPI *pfnQOSCreateHandle)(PQOS_VERSION Version, PHANDLE QOSHandle);
 BOOL (WINAPI *pfnQOSCloseHandle)(HANDLE QOSHandle);
 BOOL (WINAPI *pfnQOSAddSocketToFlow)(HANDLE QOSHandle, SOCKET Socket, PSOCKADDR DestAddr, QOS_TRAFFIC_TYPE TrafficType, DWORD Flags, PQOS_FLOWID FlowId);
+
+#endif
 
 int
 enet_initialize (void)
@@ -40,6 +62,7 @@ enet_initialize (void)
 
     timeBeginPeriod (1);
 
+#ifndef ON_UWP
     QwaveLibraryHandle = LoadLibraryA("qwave.dll");
     if (QwaveLibraryHandle != NULL) {
         pfnQOSCreateHandle = (void*)GetProcAddress(QwaveLibraryHandle, "QOSCreateHandle");
@@ -55,13 +78,14 @@ enet_initialize (void)
             QwaveLibraryHandle = NULL;
         }
     }
-
+#endif
     return 0;
 }
 
 void
 enet_deinitialize (void)
 {
+#ifndef ON_UWP
     qosAddedFlow = FALSE;
     qosFlowId = 0;
 
@@ -79,7 +103,7 @@ enet_deinitialize (void)
         FreeLibrary(QwaveLibraryHandle);
         QwaveLibraryHandle = NULL;
     }
-
+#endif
     timeEndPeriod (1);
 
     WSACleanup ();
@@ -264,6 +288,7 @@ enet_socket_set_option (ENetSocket socket, ENetSocketOption option, int value)
 
         case ENET_SOCKOPT_QOS:
         {
+#ifndef ON_UWP
             if (value)
             {
                 QOS_VERSION qosVersion;
@@ -283,7 +308,7 @@ enet_socket_set_option (ENetSocket socket, ENetSocketOption option, int value)
 
             qosAddedFlow = FALSE;
             qosFlowId = 0;
-
+#endif
             result = 0;
             break;
         }
@@ -361,7 +386,7 @@ enet_socket_send (ENetSocket socket,
                   size_t bufferCount)
 {
     DWORD sentLength;
-
+#ifndef ON_UWP
     if (!qosAddedFlow && qosHandle != INVALID_HANDLE_VALUE)
     {
         qosFlowId = 0; // Must be initialized to 0
@@ -375,6 +400,7 @@ enet_socket_send (ENetSocket socket,
         // Even if we failed, don't try again
         qosAddedFlow = TRUE;
     }
+#endif
 
     if (WSASendTo (socket, 
                    (LPWSABUF) buffers,
