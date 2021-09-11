@@ -7,6 +7,10 @@
 #define ENET_BUILDING_LIB 1
 #include "enet/enet.h"
 #include <windows.h>
+#ifdef __MINGW32__
+typedef UINT32 QOS_FLOWID, *PQOS_FLOWID;
+#define QOS_NON_ADAPTIVE_FLOW 0x00000002
+#endif
 #include <mmsystem.h>
 #include <qos2.h>
 
