@@ -7,8 +7,17 @@
 #define ENET_BUILDING_LIB 1
 #include "enet/enet.h"
 #include <windows.h>
+#ifndef HAS_QOS_FLOWID
+typedef UINT32 QOS_FLOWID;
+#endif
+#ifndef HAS_PQOS_FLOWID
+typedef UINT32 *PQOS_FLOWID;
+#endif
 #include <mmsystem.h>
 #include <qos2.h>
+#ifndef QOS_NON_ADAPTIVE_FLOW
+#define QOS_NON_ADAPTIVE_FLOW 0x00000002
+#endif
 
 static enet_uint32 timeBase = 0;
 
