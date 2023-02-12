@@ -4,6 +4,16 @@
 */
 #ifndef _WIN32
 
+// Required for IPV6_PKTINFO with Darwin headers
+#ifndef __APPLE_USE_RFC_3542
+#define __APPLE_USE_RFC_3542 1
+#endif
+
+// Required for in6_pktinfo with glibc headers
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE 1
+#endif
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -298,7 +308,37 @@ enet_socket_listen (ENetSocket socket, int backlog)
 ENetSocket
 enet_socket_create (int af, ENetSocketType type)
 {
-    return socket (af, type == ENET_SOCKET_TYPE_DATAGRAM ? SOCK_DGRAM : SOCK_STREAM, 0);
+    ENetSocket sock = socket (af, type == ENET_SOCKET_TYPE_DATAGRAM ? SOCK_DGRAM : SOCK_STREAM, 0);
+    if (sock < 0) {
+        return sock;
+    }
+
+#ifdef IPV6_V6ONLY
+    if (af == AF_INET6) {
+        int off = 0;
+
+        // Some OSes don't support dual-stack sockets, so ignore failures
+        setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&off, sizeof(off));
+    }
+#endif
+
+#ifdef IP_PKTINFO
+    {
+        // We turn this on for all sockets because it may be required for IPv4
+        // traffic on dual-stack sockets on some OSes.
+        int on = 1;
+        setsockopt(sock, IPPROTO_IP, IP_PKTINFO, (char *)&on, sizeof(on));
+    }
+#endif
+
+#ifdef IPV6_RECVPKTINFO
+    if (af == AF_INET6) {
+        int on = 1;
+        setsockopt(sock, IPPROTO_IPV6, IPV6_RECVPKTINFO, (char *)&on, sizeof(on));
+    }
+#endif
+
+    return sock;
 }
 
 int
@@ -448,7 +488,8 @@ enet_socket_destroy (ENetSocket socket)
 
 int
 enet_socket_send (ENetSocket socket,
-                  const ENetAddress * address,
+                  const ENetAddress * peerAddress,
+                  const ENetAddress * localAddress,
                   const ENetBuffer * buffers,
                   size_t bufferCount)
 {
@@ -486,23 +527,64 @@ enet_socket_send (ENetSocket socket,
     }
     
     sentLength = sendto (socket, sendBuffer, sendLength, MSG_NOSIGNAL,
-        (struct sockaddr *) & address -> address, address -> addressLength);
+        (struct sockaddr *) & peerAddress -> address, peerAddress -> addressLength);
         
     if (bufferCount > 1)
       free(sendBuffer);
 #else
     struct msghdr msgHdr;
+    char controlBufData[1024];
 
     memset (& msgHdr, 0, sizeof (struct msghdr));
 
-    if (address != NULL)
+    if (peerAddress != NULL)
     {
-        msgHdr.msg_name = (void*) & address -> address;
-        msgHdr.msg_namelen = address -> addressLength;
+        msgHdr.msg_name = (void*) & peerAddress -> address;
+        msgHdr.msg_namelen = peerAddress -> addressLength;
     }
 
     msgHdr.msg_iov = (struct iovec *) buffers;
     msgHdr.msg_iovlen = bufferCount;
+
+    // We always send traffic from the same local address as we last received
+    // from this peer to ensure it correctly recognizes our responses as
+    // coming from the expected host.
+    if (localAddress != NULL) {
+#ifdef IP_PKTINFO
+        if (localAddress->address.ss_family == AF_INET) {
+            struct in_pktinfo pktInfo;
+
+            pktInfo.ipi_spec_dst = ((struct sockaddr_in*)&localAddress->address)->sin_addr;
+            pktInfo.ipi_ifindex = 0; // Unspecified
+
+            msgHdr.msg_control = controlBufData;
+            msgHdr.msg_controllen = CMSG_SPACE(sizeof(pktInfo));
+
+            struct cmsghdr *chdr = CMSG_FIRSTHDR(&msgHdr);
+            chdr->cmsg_level = IPPROTO_IP;
+            chdr->cmsg_type = IP_PKTINFO;
+            chdr->cmsg_len = CMSG_LEN(sizeof(pktInfo));
+            memcpy(CMSG_DATA(chdr), &pktInfo, sizeof(pktInfo));
+        }
+#endif
+#ifdef IPV6_PKTINFO
+        if (localAddress->address.ss_family == AF_INET6) {
+            struct in6_pktinfo pktInfo;
+
+            pktInfo.ipi6_addr = ((struct sockaddr_in6*)&localAddress->address)->sin6_addr;
+            pktInfo.ipi6_ifindex = 0; // Unspecified
+
+            msgHdr.msg_control = controlBufData;
+            msgHdr.msg_controllen = CMSG_SPACE(sizeof(pktInfo));
+
+            struct cmsghdr *chdr = CMSG_FIRSTHDR(&msgHdr);
+            chdr->cmsg_level = IPPROTO_IPV6;
+            chdr->cmsg_type = IPV6_PKTINFO;
+            chdr->cmsg_len = CMSG_LEN(sizeof(pktInfo));
+            memcpy(CMSG_DATA(chdr), &pktInfo, sizeof(pktInfo));
+        }
+ #endif
+    }
 
     sentLength = sendmsg (socket, & msgHdr, MSG_NOSIGNAL);
 #endif
@@ -520,7 +602,8 @@ enet_socket_send (ENetSocket socket,
 
 int
 enet_socket_receive (ENetSocket socket,
-                     ENetAddress * address,
+                     ENetAddress * peerAddress,
+                     ENetAddress * localAddress,
                      ENetBuffer * buffers,
                      size_t bufferCount)
 {
@@ -531,7 +614,7 @@ enet_socket_receive (ENetSocket socket,
     
     address -> addressLength = sizeof (address -> address);
     recvLength = recvfrom (socket, buffers[0].data, buffers[0].dataLength, MSG_NOSIGNAL,
-        (struct sockaddr *) & address -> address, & address -> addressLength);
+        (struct sockaddr *) & peerAddress -> address, & peerAddress -> addressLength);
     
     if (recvLength == -1)
     {
@@ -544,17 +627,20 @@ enet_socket_receive (ENetSocket socket,
     return recvLength;
 #else
     struct msghdr msgHdr;
+    char controlBufData[1024];
 
     memset (& msgHdr, 0, sizeof (struct msghdr));
 
-    if (address != NULL)
+    if (peerAddress != NULL)
     {
-        msgHdr.msg_name = & address -> address;
-        msgHdr.msg_namelen = sizeof (address -> address);
+        msgHdr.msg_name = & peerAddress -> address;
+        msgHdr.msg_namelen = sizeof (peerAddress -> address);
     }
 
     msgHdr.msg_iov = (struct iovec *) buffers;
     msgHdr.msg_iovlen = bufferCount;
+    msgHdr.msg_control = controlBufData;
+    msgHdr.msg_controllen = sizeof(controlBufData);
 
     recvLength = recvmsg (socket, & msgHdr, MSG_NOSIGNAL);
 
@@ -565,14 +651,43 @@ enet_socket_receive (ENetSocket socket,
 
        return -1;
     }
-    
-    if (address != NULL)
-      address -> addressLength = msgHdr.msg_namelen;
 
 #ifdef HAS_MSGHDR_FLAGS
     if (msgHdr.msg_flags & MSG_TRUNC)
       return -1;
 #endif
+
+    // Retrieve the local address that this traffic was received on
+    // to ensure we respond from the correct address/interface.
+    if (localAddress != NULL) {
+        for (struct cmsghdr *chdr = CMSG_FIRSTHDR(&msgHdr); chdr != NULL; chdr = CMSG_NXTHDR(&msgHdr, chdr)) {
+#ifdef IP_PKTINFO
+            if (chdr->cmsg_level == IPPROTO_IP && chdr->cmsg_type == IP_PKTINFO) {
+                struct sockaddr_in *localAddr = (struct sockaddr_in*)&localAddress->address;
+
+                localAddr->sin_family = AF_INET;
+                localAddr->sin_addr = ((struct in_pktinfo*)CMSG_DATA(chdr))->ipi_addr;
+
+                localAddress->addressLength = sizeof(*localAddr);
+                break;
+            }
+#endif
+#ifdef IPV6_PKTINFO
+            if (chdr->cmsg_level == IPPROTO_IPV6 && chdr->cmsg_type == IPV6_PKTINFO) {
+                struct sockaddr_in6 *localAddr = (struct sockaddr_in6*)&localAddress->address;
+
+                localAddr->sin6_family = AF_INET6;
+                localAddr->sin6_addr = ((struct in6_pktinfo*)CMSG_DATA(chdr))->ipi6_addr;
+
+                localAddress->addressLength = sizeof(*localAddr);
+                break;
+            }
+ #endif
+        }
+    }
+
+    if (peerAddress != NULL)
+      peerAddress -> addressLength = msgHdr.msg_namelen;
 
     return recvLength;
 #endif
