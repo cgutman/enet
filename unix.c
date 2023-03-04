@@ -612,7 +612,7 @@ enet_socket_receive (ENetSocket socket,
 #ifdef NO_MSGAPI
     // This will ONLY work with a single buffer!
     
-    peerAddress -> peerAddressLength = sizeof (address -> address);
+    peerAddress -> peerAddressLength = sizeof (peerAddress -> address);
     recvLength = recvfrom (socket, buffers[0].data, buffers[0].dataLength, MSG_NOSIGNAL,
         (struct sockaddr *) & peerAddress -> address, & peerAddress -> addressLength);
     
