@@ -309,7 +309,7 @@ enet_protocol_handle_connect (ENetHost * host, ENetProtocolHeader * header, ENet
         }
         else 
         if (currentPeer -> state != ENET_PEER_STATE_CONNECTING &&
-            enet_address_equal (& currentPeer -> address, & host -> receivedAddress))
+            enet_address_equal (& currentPeer -> address, & host -> receivedPeerAddress))
         {
             if (currentPeer -> connectID == command -> connect.connectID)
               return NULL;
@@ -329,7 +329,8 @@ enet_protocol_handle_connect (ENetHost * host, ENetProtocolHeader * header, ENet
     peer -> channelCount = channelCount;
     peer -> state = ENET_PEER_STATE_ACKNOWLEDGING_CONNECT;
     peer -> connectID = command -> connect.connectID;
-    peer -> address = host -> receivedAddress;
+    peer -> address = host -> receivedPeerAddress;
+    peer -> localAddress = host -> receivedLocalAddress;
     peer -> outgoingPeerID = ENET_NET_TO_HOST_16 (command -> connect.outgoingPeerID);
     peer -> incomingBandwidth = ENET_NET_TO_HOST_32 (command -> connect.incomingBandwidth);
     peer -> outgoingBandwidth = ENET_NET_TO_HOST_32 (command -> connect.outgoingBandwidth);
@@ -1072,7 +1073,8 @@ enet_protocol_handle_incoming_commands (ENetHost * host, ENetEvent * event)
        
     if (peer != NULL)
     {
-       memcpy(& peer -> address, & host -> receivedAddress, sizeof (host -> receivedAddress));
+       memcpy(& peer -> address, & host -> receivedPeerAddress, sizeof (host -> receivedPeerAddress));
+       memcpy(& peer -> localAddress, & host -> receivedLocalAddress, sizeof (host -> receivedLocalAddress));
        peer -> incomingDataTotal += host -> receivedDataLength;
     }
     
@@ -1223,7 +1225,8 @@ enet_protocol_receive_incoming_commands (ENetHost * host, ENetEvent * event)
        buffer.dataLength = sizeof (host -> packetData [0]);
 
        receivedLength = enet_socket_receive (host -> socket,
-                                             & host -> receivedAddress,
+                                             & host -> receivedPeerAddress,
+                                             & host -> receivedLocalAddress,
                                              & buffer,
                                              1);
 
@@ -1690,7 +1693,7 @@ enet_protocol_send_outgoing_commands (ENetHost * host, ENetEvent * event, int ch
             enet_socket_set_option (host -> socket, ENET_SOCKOPT_QOS, 0);
         }
 
-        sentLength = enet_socket_send (host -> socket, & currentPeer -> address, host -> buffers, host -> bufferCount);
+        sentLength = enet_socket_send (host -> socket, & currentPeer -> address, & currentPeer -> localAddress, host -> buffers, host -> bufferCount);
 
         enet_protocol_remove_sent_unreliable_commands (currentPeer);
 
