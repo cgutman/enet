@@ -50,8 +50,6 @@ enet_initialize (void)
        return -1;
     }
 
-    timeBeginPeriod (1);
-
     QwaveLibraryHandle = LoadLibraryA("qwave.dll");
     if (QwaveLibraryHandle != NULL) {
         pfnQOSCreateHandle = (void*)GetProcAddress(QwaveLibraryHandle, "QOSCreateHandle");
@@ -91,8 +89,6 @@ enet_deinitialize (void)
         FreeLibrary(QwaveLibraryHandle);
         QwaveLibraryHandle = NULL;
     }
-
-    timeEndPeriod (1);
 
     WSACleanup ();
 }
