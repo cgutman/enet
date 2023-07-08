@@ -55,14 +55,16 @@ typedef enum _ENetSocketWait
 typedef enum _ENetSocketOption
 {
    ENET_SOCKOPT_NONBLOCK  = 1,
-   ENET_SOCKOPT_RCVBUF,
-   ENET_SOCKOPT_SNDBUF,
-   ENET_SOCKOPT_REUSEADDR,
-   ENET_SOCKOPT_RCVTIMEO,
-   ENET_SOCKOPT_SNDTIMEO,
-   ENET_SOCKOPT_ERROR,
-   ENET_SOCKOPT_NODELAY,
-   ENET_SOCKOPT_QOS,
+   ENET_SOCKOPT_BROADCAST = 2,
+   ENET_SOCKOPT_RCVBUF    = 3,
+   ENET_SOCKOPT_SNDBUF    = 4,
+   ENET_SOCKOPT_REUSEADDR = 5,
+   ENET_SOCKOPT_RCVTIMEO  = 6,
+   ENET_SOCKOPT_SNDTIMEO  = 7,
+   ENET_SOCKOPT_ERROR     = 8,
+   ENET_SOCKOPT_NODELAY   = 9,
+   ENET_SOCKOPT_TTL       = 10,
+   ENET_SOCKOPT_QOS       = 11,
 } ENetSocketOption;
 
 typedef enum _ENetSocketShutdown
@@ -158,7 +160,7 @@ typedef struct _ENetOutgoingCommand
    enet_uint16  unreliableSequenceNumber;
    enet_uint32  sentTime;
    enet_uint32  roundTripTimeout;
-   enet_uint32  roundTripTimeoutLimit;
+   enet_uint32  queueTime;
    enet_uint32  fragmentOffset;
    enet_uint16  fragmentLength;
    enet_uint16  sendAttempts;
@@ -241,7 +243,8 @@ typedef struct _ENetChannel
 
 typedef enum _ENetPeerFlag
 {
-   ENET_PEER_FLAG_NEEDS_DISPATCH = (1 << 0)
+   ENET_PEER_FLAG_NEEDS_DISPATCH   = (1 << 0),
+   ENET_PEER_FLAG_CONTINUE_SENDING = (1 << 1)
 } ENetPeerFlag;
 
 /**
@@ -302,7 +305,7 @@ typedef struct _ENetPeer
    enet_uint16   outgoingReliableSequenceNumber;
    ENetList      acknowledgements;
    ENetList      sentReliableCommands;
-   ENetList      sentUnreliableCommands;
+   ENetList      outgoingSendReliableCommands;
    ENetList      outgoingCommands;
    ENetList      dispatchedCommands;
    enet_uint16   flags;
@@ -364,7 +367,7 @@ typedef struct _ENetHost
    size_t               channelLimit;                /**< maximum number of channels allowed for connected peers */
    enet_uint32          serviceTime;
    ENetList             dispatchQueue;
-   int                  continueSending;
+   enet_uint32          totalQueued;
    size_t               packetSize;
    enet_uint16          headerFlags;
    ENetProtocol         commands [ENET_PROTOCOL_MAXIMUM_PACKET_COMMANDS];
@@ -550,6 +553,7 @@ ENET_API void                enet_peer_disconnect_later (ENetPeer *, enet_uint32
 ENET_API void                enet_peer_throttle_configure (ENetPeer *, enet_uint32, enet_uint32, enet_uint32);
 extern int                   enet_peer_throttle (ENetPeer *, enet_uint32);
 extern void                  enet_peer_reset_queues (ENetPeer *);
+extern int                   enet_peer_has_outgoing_commands (ENetPeer *);
 extern void                  enet_peer_setup_outgoing_command (ENetPeer *, ENetOutgoingCommand *);
 extern ENetOutgoingCommand * enet_peer_queue_outgoing_command (ENetPeer *, const ENetProtocol *, ENetPacket *, enet_uint32, enet_uint16);
 extern ENetIncomingCommand * enet_peer_queue_incoming_command (ENetPeer *, const ENetProtocol *, const void *, size_t, enet_uint32, enet_uint32);
