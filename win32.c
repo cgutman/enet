@@ -21,24 +21,11 @@ typedef UINT32 *PQOS_FLOWID;
 
 static enet_uint32 timeBase = 0;
 
-#if defined(WINAPI_FAMILY) && WINAPI_FAMILY == WINAPI_FAMILY_APP
-# define ON_UWP
+#if !(defined(WINAPI_FAMILY) && WINAPI_FAMILY == WINAPI_FAMILY_APP)
+# define HAS_QWAVE
 #endif
 
-#ifdef ON_UWP
-void timeBeginPeriod(int t) {
-
-}
-void timeEndPeriod(int t) {
-
-}
-
-enet_uint32 timeGetTime()
-{
-    return GetTickCount64();
-}
-
-#else 
+#ifdef HAS_QWAVE
 
 static HANDLE qosHandle = INVALID_HANDLE_VALUE;
 static QOS_FLOWID qosFlowId;
@@ -72,7 +59,7 @@ enet_initialize (void)
        return -1;
     }
 
-#ifndef ON_UWP
+#ifdef HAS_QWAVE
     QwaveLibraryHandle = LoadLibraryA("qwave.dll");
     if (QwaveLibraryHandle != NULL) {
         pfnQOSCreateHandle = (void*)GetProcAddress(QwaveLibraryHandle, "QOSCreateHandle");
@@ -95,7 +82,7 @@ enet_initialize (void)
 void
 enet_deinitialize (void)
 {
-#ifndef ON_UWP
+#ifdef HAS_QWAVE
     qosAddedFlow = FALSE;
     qosFlowId = 0;
 
@@ -335,7 +322,7 @@ enet_socket_set_option (ENetSocket socket, ENetSocketOption option, int value)
 
         case ENET_SOCKOPT_QOS:
         {
-#ifndef ON_UWP
+#ifdef HAS_QWAVE
             if (value)
             {
                 QOS_VERSION qosVersion;
@@ -436,7 +423,7 @@ enet_socket_send (ENetSocket socket,
     DWORD sentLength;
     WSAMSG msg = { 0 };
     char controlBufData[1024];
-#ifndef ON_UWP
+#ifdef HAS_QWAVE
     if (!qosAddedFlow && qosHandle != INVALID_HANDLE_VALUE)
     {
         qosFlowId = 0; // Must be initialized to 0
