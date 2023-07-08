@@ -14,7 +14,6 @@ typedef UINT32 QOS_FLOWID;
 #ifndef HAS_PQOS_FLOWID
 typedef UINT32 *PQOS_FLOWID;
 #endif
-#include <mmsystem.h>
 #include <qos2.h>
 #ifndef QOS_NON_ADAPTIVE_FLOW
 #define QOS_NON_ADAPTIVE_FLOW 0x00000002
@@ -73,8 +72,6 @@ enet_initialize (void)
        return -1;
     }
 
-    timeBeginPeriod (1);
-
 #ifndef ON_UWP
     QwaveLibraryHandle = LoadLibraryA("qwave.dll");
     if (QwaveLibraryHandle != NULL) {
@@ -117,27 +114,25 @@ enet_deinitialize (void)
         QwaveLibraryHandle = NULL;
     }
 #endif
-    timeEndPeriod (1);
-
     WSACleanup ();
 }
 
 enet_uint32
 enet_host_random_seed (void)
 {
-    return (enet_uint32) timeGetTime ();
+    return (enet_uint32) GetTickCount ();
 }
 
 enet_uint32
 enet_time_get (void)
 {
-    return (enet_uint32) timeGetTime () - timeBase;
+    return (enet_uint32) GetTickCount () - timeBase;
 }
 
 void
 enet_time_set (enet_uint32 newTimeBase)
 {
-    timeBase = (enet_uint32) timeGetTime () - newTimeBase;
+    timeBase = (enet_uint32) GetTickCount () - newTimeBase;
 }
 
 int
