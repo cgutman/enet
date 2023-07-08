@@ -20,6 +20,13 @@ typedef UINT32 *PQOS_FLOWID;
 #endif
 
 static enet_uint32 timeBase = 0;
+
+#if !(defined(WINAPI_FAMILY) && WINAPI_FAMILY == WINAPI_FAMILY_APP)
+# define HAS_QWAVE
+#endif
+
+#ifdef HAS_QWAVE
+
 static HANDLE qosHandle = INVALID_HANDLE_VALUE;
 static QOS_FLOWID qosFlowId;
 static BOOL qosAddedFlow;
@@ -30,7 +37,10 @@ BOOL (WINAPI *pfnQOSCreateHandle)(PQOS_VERSION Version, PHANDLE QOSHandle);
 BOOL (WINAPI *pfnQOSCloseHandle)(HANDLE QOSHandle);
 BOOL (WINAPI *pfnQOSAddSocketToFlow)(HANDLE QOSHandle, SOCKET Socket, PSOCKADDR DestAddr, QOS_TRAFFIC_TYPE TrafficType, DWORD Flags, PQOS_FLOWID FlowId);
 
+#endif
+
 LPFN_WSARECVMSG pfnWSARecvMsg;
+
 
 int
 enet_initialize (void)
@@ -49,6 +59,7 @@ enet_initialize (void)
        return -1;
     }
 
+#ifdef HAS_QWAVE
     QwaveLibraryHandle = LoadLibraryA("qwave.dll");
     if (QwaveLibraryHandle != NULL) {
         pfnQOSCreateHandle = (void*)GetProcAddress(QwaveLibraryHandle, "QOSCreateHandle");
@@ -64,13 +75,14 @@ enet_initialize (void)
             QwaveLibraryHandle = NULL;
         }
     }
-
+#endif
     return 0;
 }
 
 void
 enet_deinitialize (void)
 {
+#ifdef HAS_QWAVE
     qosAddedFlow = FALSE;
     qosFlowId = 0;
 
@@ -88,7 +100,7 @@ enet_deinitialize (void)
         FreeLibrary(QwaveLibraryHandle);
         QwaveLibraryHandle = NULL;
     }
-
+#endif
     WSACleanup ();
 }
 
@@ -310,6 +322,7 @@ enet_socket_set_option (ENetSocket socket, ENetSocketOption option, int value)
 
         case ENET_SOCKOPT_QOS:
         {
+#ifdef HAS_QWAVE
             if (value)
             {
                 QOS_VERSION qosVersion;
@@ -329,7 +342,7 @@ enet_socket_set_option (ENetSocket socket, ENetSocketOption option, int value)
 
             qosAddedFlow = FALSE;
             qosFlowId = 0;
-
+#endif
             result = 0;
             break;
         }
@@ -410,7 +423,7 @@ enet_socket_send (ENetSocket socket,
     DWORD sentLength;
     WSAMSG msg = { 0 };
     char controlBufData[1024];
-
+#ifdef HAS_QWAVE
     if (!qosAddedFlow && qosHandle != INVALID_HANDLE_VALUE)
     {
         qosFlowId = 0; // Must be initialized to 0
@@ -424,6 +437,7 @@ enet_socket_send (ENetSocket socket,
         // Even if we failed, don't try again
         qosAddedFlow = TRUE;
     }
+#endif
 
     msg.name = peerAddress != NULL ? (struct sockaddr *) & peerAddress -> address : NULL;
     msg.namelen = peerAddress != NULL ? peerAddress -> addressLength : 0;
