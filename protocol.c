@@ -1381,6 +1381,7 @@ enet_protocol_check_timeouts (ENetHost * host, ENetPeer * peer, ENetEvent * even
        ++ peer -> packetsLost;
 
        roundTripTimeout = peer -> roundTripTime + 4 * ENET_MAX (1, peer -> roundTripTimeVariance);
+       roundTripTimeout = ENET_MIN (roundTripTimeout, peer->timeoutMaximum / 5);
        if (outgoingCommand -> sendAttempts < peer -> timeoutLimit)
           outgoingCommand -> roundTripTimeout = roundTripTimeout * ENET_MAX (1, outgoingCommand -> sendAttempts);
        else
