@@ -534,13 +534,15 @@ enet_socket_receive (ENetSocket socket,
        case WSAEWOULDBLOCK:
        case WSAECONNRESET:
           return 0;
+       case WSAEMSGSIZE:
+          return -2;
        }
 
        return -1;
     }
 
     if (msg.dwFlags & MSG_PARTIAL)
-      return -1;
+      return -2;
 
     // Retrieve the local address that this traffic was received on
     // to ensure we respond from the correct address/interface.
