@@ -1380,7 +1380,7 @@ enet_protocol_check_timeouts (ENetHost * host, ENetPeer * peer, ENetEvent * even
 
        ++ peer -> packetsLost;
 
-       roundTripTimeout = peer -> roundTripTime + 4 * ENET_MAX (1, peer -> roundTripTimeVariance);
+       roundTripTimeout = peer -> roundTripTime + ENET_MIN (peer -> roundTripTime, 4 * ENET_MAX (1, peer -> roundTripTimeVariance));
        roundTripTimeout = ENET_MIN (roundTripTimeout, peer->timeoutMaximum / 5);
        if (outgoingCommand -> sendAttempts < peer -> timeoutLimit)
           outgoingCommand -> roundTripTimeout = roundTripTimeout * ENET_MAX (1, outgoingCommand -> sendAttempts);
@@ -1503,9 +1503,11 @@ enet_protocol_check_outgoing_commands (ENetHost * host, ENetPeer * peer, ENetLis
           }
 
           ++ outgoingCommand -> sendAttempts;
- 
-          if (outgoingCommand -> roundTripTimeout == 0)
-            outgoingCommand -> roundTripTimeout = peer -> roundTripTime + 4 * ENET_MAX (1, peer -> roundTripTimeVariance);
+
+          if (outgoingCommand -> roundTripTimeout == 0) {
+             outgoingCommand -> roundTripTimeout = peer -> roundTripTime + ENET_MIN (peer -> roundTripTime, 4 * ENET_MAX (1, peer -> roundTripTimeVariance));
+             outgoingCommand -> roundTripTimeout = ENET_MIN (outgoingCommand -> roundTripTimeout, peer->timeoutMaximum / 5);
+          }
 
           if (enet_list_empty (& peer -> sentReliableCommands))
             peer -> nextTimeout = host -> serviceTime + outgoingCommand -> roundTripTimeout;
