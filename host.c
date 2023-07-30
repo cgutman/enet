@@ -64,7 +64,6 @@ enet_host_create (int addressFamily, const ENetAddress * address, size_t peerCou
     enet_socket_set_option (host -> socket, ENET_SOCKOPT_NONBLOCK, 1);
     enet_socket_set_option (host -> socket, ENET_SOCKOPT_RCVBUF, ENET_HOST_RECEIVE_BUFFER_SIZE);
     enet_socket_set_option (host -> socket, ENET_SOCKOPT_SNDBUF, ENET_HOST_SEND_BUFFER_SIZE);
-    enet_socket_set_option (host -> socket, ENET_SOCKOPT_QOS, 1);
 
     if (address != NULL && enet_socket_get_address (host -> socket, & host -> address) < 0)   
       host -> address = * address;
