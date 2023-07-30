@@ -19,7 +19,7 @@ check_struct_has_member("struct msghdr" "msg_flags" "sys/types.h;sys/socket.h" H
 set(CMAKE_EXTRA_INCLUDE_FILES "sys/types.h" "sys/socket.h")
 check_type_size("socklen_t" HAS_SOCKLEN_T BUILTIN_TYPES_ONLY)
 unset(CMAKE_EXTRA_INCLUDE_FILES)
-set(CMAKE_EXTRA_INCLUDE_FILES "qos2.h")
+set(CMAKE_EXTRA_INCLUDE_FILES "winsock2.h;qos2.h")
 check_type_size("QOS_FLOWID" HAS_QOS_FLOWID BUILTIN_TYPES_ONLY)
 check_type_size("PQOS_FLOWID" HAS_PQOS_FLOWID BUILTIN_TYPES_ONLY)
 unset(CMAKE_EXTRA_INCLUDE_FILES)
