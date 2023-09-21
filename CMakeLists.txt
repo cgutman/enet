@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 2.8.12...3.20)
 
 project(enet)
 
+option(ENET_NO_INSTALL "Disable installation of headers and libraries" OFF)
+
 # The "configure" step.
 include(CheckFunctionExists)
 include(CheckStructHasMember)
@@ -108,10 +110,12 @@ if (MINGW)
     target_link_libraries(enet winmm ws2_32)
 endif()
 
-install(TARGETS enet
-    RUNTIME DESTINATION bin
-    ARCHIVE DESTINATION lib/static
-    LIBRARY DESTINATION lib)
+if(NOT ENET_NO_INSTALL)
+    install(TARGETS enet
+        RUNTIME DESTINATION bin
+        ARCHIVE DESTINATION lib/static
+        LIBRARY DESTINATION lib)
 
-install(DIRECTORY include/
-        DESTINATION include)
+    install(DIRECTORY include/
+            DESTINATION include)
+endif()
