@@ -1882,7 +1882,6 @@ enet_host_service (ENetHost * host, ENetEvent * event, enet_uint32 timeout)
             printf("RTT: %u\n", host -> peers -> roundTripTime);
             host -> peers -> lastRoundTripTime = host -> peers -> roundTripTime;
           }
-          
 
           if (enet_socket_wait (host -> socket, & waitCondition, ENET_TIME_DIFFERENCE (timeout, host -> serviceTime) / 10) != 0)
             return -1;
