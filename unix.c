@@ -110,6 +110,9 @@
 #define NO_MSGAPI 1
 #endif
 #elif defined(__3DS__)
+#ifdef AF_INET6
+#undef AF_INET6
+#endif
 #ifndef HAS_POLL
 #define HAS_POLL 1
 #endif
