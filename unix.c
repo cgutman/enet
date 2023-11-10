@@ -232,7 +232,7 @@ enet_address_equal (ENetAddress * address1, ENetAddress * address2)
         return sin1 -> sin_port == sin2 -> sin_port &&
             sin1 -> sin_addr.s_addr == sin2 -> sin_addr.s_addr;
     }
-#if defined(AF_INET6) && !(defined(__3DS__))
+#ifdef AF_INET6
     case AF_INET6:
     {
         struct sockaddr_in6 *sin6a, *sin6b;
@@ -258,7 +258,7 @@ enet_address_set_port (ENetAddress * address, enet_uint16 port)
         sin -> sin_port = ENET_HOST_TO_NET_16 (port);
         return 0;
     }
-#if defined(AF_INET6) && !(defined(__3DS__))
+#ifdef AF_INET6
     else if (address -> address.ss_family == AF_INET6)
     {
         struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) &address -> address;
