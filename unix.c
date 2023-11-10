@@ -1,4 +1,4 @@
-/** 
+/**
  @file  unix.c
  @brief ENet Unix system specific functions
 */
@@ -109,6 +109,37 @@
 #ifndef NO_MSGAPI
 #define NO_MSGAPI 1
 #endif
+#elif defined(__3DS__)
+#ifdef AF_INET6
+#undef AF_INET6
+#endif
+#ifndef HAS_POLL
+#define HAS_POLL 1
+#endif
+#ifndef HAS_FCNTL
+#define HAS_FCNTL 1
+#endif
+#ifndef HAS_IOCTL
+#define HAS_IOCTL 1
+#endif
+#ifndef HAS_INET_PTON
+#define HAS_INET_PTON 1
+#endif
+#ifndef HAS_INET_NTOP
+#define HAS_INET_NTOP 1
+#endif
+#ifndef HAS_SOCKLEN_T
+#define HAS_SOCKLEN_T 1
+#endif
+#ifndef HAS_GETADDRINFO
+#define HAS_GETADDRINFO 1
+#endif
+#ifndef HAS_GETNAMEINFO
+#define HAS_GETNAMEINFO 1
+#endif
+#ifndef NO_MSGAPI
+#define NO_MSGAPI 1
+#endif
 #else
 #ifndef HAS_IOCTL
 #define HAS_IOCTL 1
@@ -159,9 +190,9 @@ enet_uint32
 enet_host_random_seed (void)
 {
     struct timeval timeVal;
-    
+
     gettimeofday (& timeVal, NULL);
-    
+
     return (timeVal.tv_sec * 1000) ^ (timeVal.tv_usec / 1000);
 }
 
@@ -181,7 +212,7 @@ enet_time_set (enet_uint32 newTimeBase)
     struct timeval timeVal;
 
     gettimeofday (& timeVal, NULL);
-    
+
     timeBase = timeVal.tv_sec * 1000 + timeVal.tv_usec / 1000 - newTimeBase;
 }
 
@@ -268,9 +299,9 @@ enet_address_set_host (ENetAddress * address, const char * name)
     {
         memcpy (& address -> address, result -> ai_addr, result -> ai_addrlen);
         address -> addressLength = result -> ai_addrlen;
-        
+
         freeaddrinfo (resultList);
-        
+
         return 0;
     }
 
@@ -299,7 +330,7 @@ enet_socket_get_address (ENetSocket socket, ENetAddress * address)
     return 0;
 }
 
-int 
+int
 enet_socket_listen (ENetSocket socket, int backlog)
 {
     return listen (socket, backlog < 0 ? SOMAXCONN : backlog);
@@ -371,7 +402,7 @@ enet_socket_set_option (ENetSocket socket, ENetSocketOption option, int value)
             result = setsockopt (socket, SOL_SOCKET, SO_SNDBUF, (char *) & value, sizeof (int));
             break;
 
-#ifndef __WIIU__
+#if !defined(__WIIU__) && !defined(__3DS__)
         case ENET_SOCKOPT_RCVTIMEO:
         {
             struct timeval timeVal;
@@ -472,10 +503,10 @@ enet_socket_accept (ENetSocket socket, ENetAddress * address)
     if (address != NULL)
       address -> addressLength = sizeof (address -> address);
 
-    result = accept (socket, 
-                     address != NULL ? (struct sockaddr *) & address -> address : NULL, 
+    result = accept (socket,
+                     address != NULL ? (struct sockaddr *) & address -> address : NULL,
                      address != NULL ? & address -> addressLength : NULL);
-    
+
     if (result == -1)
       return ENET_SOCKET_NULL;
 
@@ -503,25 +534,25 @@ enet_socket_send (ENetSocket socket,
                   size_t bufferCount)
 {
     int sentLength;
-    
+
 #ifdef NO_MSGAPI
     void* sendBuffer;
     size_t sendLength;
-    
+
     if (bufferCount > 1)
     {
         size_t i;
-        
+
         sendLength = 0;
         for (i = 0; i < bufferCount; i++)
         {
             sendLength += buffers[i].dataLength;
         }
-        
+
         sendBuffer = malloc (sendLength);
         if (sendBuffer == NULL)
           return -1;
-        
+
         sendLength = 0;
         for (i = 0; i < bufferCount; i++)
         {
@@ -534,10 +565,10 @@ enet_socket_send (ENetSocket socket,
         sendBuffer = buffers[0].data;
         sendLength = buffers[0].dataLength;
     }
-    
+
     sentLength = sendto (socket, sendBuffer, sendLength, MSG_NOSIGNAL,
         (struct sockaddr *) & peerAddress -> address, peerAddress -> addressLength);
-        
+
     if (bufferCount > 1)
       free(sendBuffer);
 #else
@@ -597,7 +628,7 @@ enet_socket_send (ENetSocket socket,
 
     sentLength = sendmsg (socket, & msgHdr, MSG_NOSIGNAL);
 #endif
-    
+
     if (sentLength == -1)
     {
        if (errno == EWOULDBLOCK)
@@ -620,19 +651,19 @@ enet_socket_receive (ENetSocket socket,
 
 #ifdef NO_MSGAPI
     // This will ONLY work with a single buffer!
-    
+
     peerAddress -> addressLength = sizeof (peerAddress -> address);
     recvLength = recvfrom (socket, buffers[0].data, buffers[0].dataLength, MSG_NOSIGNAL,
         (struct sockaddr *) & peerAddress -> address, & peerAddress -> addressLength);
-    
+
     if (recvLength == -1)
     {
        if (errno == EWOULDBLOCK)
          return 0;
-     
+
        return -1;
     }
-    
+
     return recvLength;
 #else
     struct msghdr msgHdr;
@@ -719,7 +750,7 @@ enet_socket_wait (ENetSocket socket, enet_uint32 * condition, enet_uint32 timeou
 #ifdef HAS_POLL
     struct pollfd pollSocket;
     int pollCount;
-    
+
     pollSocket.fd = socket;
     pollSocket.events = 0;
 
@@ -750,7 +781,7 @@ enet_socket_wait (ENetSocket socket, enet_uint32 * condition, enet_uint32 timeou
 
     if (pollSocket.revents & POLLOUT)
       * condition |= ENET_SOCKET_WAIT_SEND;
-    
+
     if (pollSocket.revents & POLLIN)
       * condition |= ENET_SOCKET_WAIT_RECEIVE;
 
@@ -782,7 +813,7 @@ enet_socket_wait (ENetSocket socket, enet_uint32 * condition, enet_uint32 timeou
 
             return 0;
         }
-      
+
         return -1;
     }
 
