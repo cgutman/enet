@@ -469,7 +469,7 @@ enet_socket_get_option (ENetSocket socket, ENetSocketOption option, int * value)
     {
         case ENET_SOCKOPT_ERROR:
             len = sizeof (int);
-#ifndef __3DS__ //getsockopt is unreliable on 3DS
+#ifndef __3DS__ //SO_ERROR is unreliable on 3DS
             result = getsockopt (socket, SOL_SOCKET, SO_ERROR, value, & len);
 #else
             result = 0;
