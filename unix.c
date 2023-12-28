@@ -29,6 +29,9 @@
 #include "enet/enet.h"
 
 #if defined(__APPLE__)
+#if !defined(IPV6_RECVPKTINFO) || !defined(IPV6_PKTINFO)
+#warning Missing IPv6 socket option definitions. Is __APPLE_USE_RFC_3542 defined?
+#endif
 #ifndef HAS_POLL
 #define HAS_POLL 1
 #endif
