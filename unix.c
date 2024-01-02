@@ -29,6 +29,9 @@
 #include "enet/enet.h"
 
 #if defined(__APPLE__)
+#if !defined(IPV6_RECVPKTINFO) || !defined(IPV6_PKTINFO)
+#warning Missing IPv6 socket option definitions. Is __APPLE_USE_RFC_3542 defined?
+#endif
 #ifndef HAS_POLL
 #define HAS_POLL 1
 #endif
@@ -215,6 +218,27 @@ enet_time_set (enet_uint32 newTimeBase)
 
     timeBase = timeVal.tv_sec * 1000 + timeVal.tv_usec / 1000 - newTimeBase;
 }
+
+#ifdef __APPLE__
+void
+enet_address_make_v4mapped (ENetAddress * address)
+{
+    ENetAddress oldAddress = *address;
+    struct sockaddr_in *sin = ((struct sockaddr_in *)&oldAddress.address);
+    struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&address->address;
+    
+    memset(sin6, 0, sizeof(*sin6));
+    sin6->sin6_family = AF_INET6;
+    sin6->sin6_len = sizeof(*sin6);
+    sin6->sin6_port = sin->sin_port;
+    
+    sin6->sin6_addr.s6_addr[10] = 0xFF;
+    sin6->sin6_addr.s6_addr[11] = 0xFF;
+    memcpy(&sin6->sin6_addr.s6_addr[12], &sin->sin_addr, 4);
+    
+    address->addressLength = sizeof(*sin6);
+}
+#endif
 
 int
 enet_address_equal (ENetAddress * address1, ENetAddress * address2)
@@ -726,8 +750,19 @@ enet_socket_receive (ENetSocket socket,
         }
     }
 
-    if (peerAddress != NULL)
-      peerAddress -> addressLength = msgHdr.msg_namelen;
+    if (peerAddress != NULL) {
+        peerAddress -> addressLength = msgHdr.msg_namelen;
+        
+#ifdef __APPLE__
+        // HACK: Apple platforms return AF_INET addresses in msg_name from recvmsg() on dual-stack sockets
+        // instead of AF_INET6 addresses then rejects those same addresses when they are passed to sendmsg().
+        // Strangely, this only happens when the socket is bound, and IPV6_PKTINFO properly returns v4-mapped
+        // addresses in the same call. This is probably a kernel bug, so we fix it up here.
+        if (peerAddress -> address.ss_family == AF_INET && localAddress -> address.ss_family == AF_INET6) {
+            enet_address_make_v4mapped(peerAddress);
+        }
+#endif
+    }
 
     return recvLength;
 #endif
