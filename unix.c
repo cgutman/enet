@@ -226,16 +226,16 @@ enet_address_make_v4mapped (ENetAddress * address)
     ENetAddress oldAddress = *address;
     struct sockaddr_in *sin = ((struct sockaddr_in *)&oldAddress.address);
     struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&address->address;
-    
+
     memset(sin6, 0, sizeof(*sin6));
     sin6->sin6_family = AF_INET6;
     sin6->sin6_len = sizeof(*sin6);
     sin6->sin6_port = sin->sin_port;
-    
+
     sin6->sin6_addr.s6_addr[10] = 0xFF;
     sin6->sin6_addr.s6_addr[11] = 0xFF;
     memcpy(&sin6->sin6_addr.s6_addr[12], &sin->sin_addr, 4);
-    
+
     address->addressLength = sizeof(*sin6);
 }
 #endif
@@ -752,7 +752,7 @@ enet_socket_receive (ENetSocket socket,
 
     if (peerAddress != NULL) {
         peerAddress -> addressLength = msgHdr.msg_namelen;
-        
+
 #ifdef __APPLE__
         // HACK: Apple platforms return AF_INET addresses in msg_name from recvmsg() on dual-stack sockets
         // instead of AF_INET6 addresses then rejects those same addresses when they are passed to sendmsg().
@@ -795,7 +795,16 @@ enet_socket_wait (ENetSocket socket, enet_uint32 * condition, enet_uint32 timeou
     if (* condition & ENET_SOCKET_WAIT_RECEIVE)
       pollSocket.events |= POLLIN;
 
+#if defined(__3DS__)
+    for (int i = 0; i < timeout; i++) {
+        pollCount = poll(& pollSocket, 1, 1); // need to do this on 3ds since poll will block even if socket is ready before
+        if (pollCount) {
+            break;
+        }
+    }
+#else
     pollCount = poll (& pollSocket, 1, timeout);
+#endif
 
     if (pollCount < 0)
     {
