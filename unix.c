@@ -177,16 +177,20 @@ typedef int socklen_t;
 #endif
 
 static enet_uint32 timeBase = 0;
+static void* sendBuffer = NULL;
+static void* sendBufferSize = 1400;
 
 int
 enet_initialize (void)
 {
+    sendBuffer = malloc(sendBufferSize);
     return 0;
 }
 
 void
 enet_deinitialize (void)
 {
+    free(sendBuffer);
 }
 
 enet_uint32
@@ -393,6 +397,10 @@ enet_socket_create (int af, ENetSocketType type)
     }
 #endif
 
+#ifdef __3DS__
+    SOCU_AddGlobalSocket(sock);
+#endif
+
     return sock;
 }
 
@@ -560,7 +568,6 @@ enet_socket_send (ENetSocket socket,
     int sentLength;
 
 #ifdef NO_MSGAPI
-    void* sendBuffer;
     size_t sendLength;
 
     if (bufferCount > 1)
@@ -573,7 +580,10 @@ enet_socket_send (ENetSocket socket,
             sendLength += buffers[i].dataLength;
         }
 
-        sendBuffer = malloc (sendLength);
+        if (sendBufferSize < sendLength) {
+            sendBuffer = realloc(sendBuffer, sendLength);
+            sendBufferSize = sendLength;
+        }
         if (sendBuffer == NULL)
           return -1;
 
@@ -593,8 +603,6 @@ enet_socket_send (ENetSocket socket,
     sentLength = sendto (socket, sendBuffer, sendLength, MSG_NOSIGNAL,
         (struct sockaddr *) & peerAddress -> address, peerAddress -> addressLength);
 
-    if (bufferCount > 1)
-      free(sendBuffer);
 #else
     struct msghdr msgHdr;
     char controlBufData[1024];
@@ -796,11 +804,13 @@ enet_socket_wait (ENetSocket socket, enet_uint32 * condition, enet_uint32 timeou
       pollSocket.events |= POLLIN;
 
 #if defined(__3DS__)
-    for (int i = 0; i < timeout; i++) {
-        pollCount = poll(& pollSocket, 1, 1); // need to do this on 3ds since poll will block even if socket is ready before
+    uint64_t poll_start = osGetTime();
+    for (uint64_t i = poll_start; (i - poll_start) < timeout; i = osGetTime()) {
+        pollCount = poll(& pollSocket, 1, 0); // need to do this on 3ds since poll will block even if socket is ready before
         if (pollCount) {
             break;
         }
+        svcSleepThread(1000);
     }
 #else
     pollCount = poll (& pollSocket, 1, timeout);
