@@ -655,10 +655,26 @@ enet_socket_send (ENetSocket socket,
 
     if (sentLength == -1)
     {
-       if (errno == EWOULDBLOCK)
-         return 0;
+        switch (errno)
+        {
+        case EWOULDBLOCK:
+            return 0;
 
-       return -1;
+        // These errors are treated as possible transient
+        // conditions that could be caused by a network
+        // interruption. We'll ignore them and allow the
+        // socket timeout to kill us if the connection
+        // is permanently interrupted.
+        case EADDRNOTAVAIL:
+        case ENETDOWN:
+        case ENETUNREACH:
+        case EHOSTDOWN:
+        case EHOSTUNREACH:
+            return 0;
+
+        default:
+            return -1;
+        }
     }
 
     return sentLength;

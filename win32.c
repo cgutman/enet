@@ -496,10 +496,26 @@ enet_socket_send (ENetSocket socket,
                     NULL,
                     NULL) == SOCKET_ERROR)
     {
-       if (WSAGetLastError () == WSAEWOULDBLOCK)
-         return 0;
+        switch (WSAGetLastError ())
+        {
+        case WSAEWOULDBLOCK:
+            return 0;
 
-       return -1;
+        // These errors are treated as possible transient
+        // conditions that could be caused by a network
+        // interruption. We'll ignore them and allow the
+        // socket timeout to kill us if the connection
+        // is permanently interrupted.
+        case WSAEADDRNOTAVAIL:
+        case WSAENETDOWN:
+        case WSAENETUNREACH:
+        case WSAEHOSTDOWN:
+        case WSAEHOSTUNREACH:
+            return 0;
+
+        default:
+            return -1;
+        }
     }
 
     return (int) sentLength;
