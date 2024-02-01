@@ -435,13 +435,35 @@ enet_socket_send (ENetSocket socket,
 #ifdef HAS_QWAVE
     if (!qosAddedFlow && qosHandle != INVALID_HANDLE_VALUE)
     {
+        static const char V4_MAPPED_V6_PREFIX[] = IN6ADDR_V4MAPPEDPREFIX_INIT;
+
+        BOOL isV4MappedV6Addr =
+            peerAddress->address.ss_family == AF_INET6 &&
+            !memcmp(&((PSOCKADDR_IN6)&peerAddress->address)->sin6_addr, V4_MAPPED_V6_PREFIX, sizeof(V4_MAPPED_V6_PREFIX));
+
+        // qWAVE doesn't properly support IPv4-mapped IPv6 addresses, nor does it
+        // correctly support IPv4 addresses on a dual-stack socket (despite MSDN's
+        // claims to the contrary). To get proper QoS tagging when hosting in dual
+        // stack mode, we will temporarily connect() the socket to allow qWAVE to
+        // successfully initialize a flow, then disconnect it again so WSASendMsg()
+        // works later on.
+        if (isV4MappedV6Addr) {
+            connect(socket, (PSOCKADDR)&peerAddress->address, peerAddress->addressLength);
+        }
+
         qosFlowId = 0; // Must be initialized to 0
         pfnQOSAddSocketToFlow(qosHandle,
                               socket,
-                              (struct sockaddr *)&peerAddress->address,
+                              isV4MappedV6Addr ? NULL : (struct sockaddr *)&peerAddress->address,
                               QOSTrafficTypeControl,
                               QOS_NON_ADAPTIVE_FLOW,
                               &qosFlowId);
+
+        if (isV4MappedV6Addr) {
+            SOCKADDR_IN6 empty = { 0 };
+            empty.sin6_family = AF_INET6;
+            connect(socket, (PSOCKADDR)&empty, sizeof(empty));
+        }
 
         // Even if we failed, don't try again
         qosAddedFlow = TRUE;
