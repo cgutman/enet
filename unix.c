@@ -177,20 +177,16 @@ typedef int socklen_t;
 #endif
 
 static enet_uint32 timeBase = 0;
-static void* sendBuffer = NULL;
-static void* sendBufferSize = 1400;
 
 int
 enet_initialize (void)
 {
-    sendBuffer = malloc(sendBufferSize);
     return 0;
 }
 
 void
 enet_deinitialize (void)
 {
-    free(sendBuffer);
 }
 
 enet_uint32
@@ -397,10 +393,6 @@ enet_socket_create (int af, ENetSocketType type)
     }
 #endif
 
-#ifdef __3DS__
-    SOCU_AddGlobalSocket(sock);
-#endif
-
     return sock;
 }
 
@@ -568,6 +560,7 @@ enet_socket_send (ENetSocket socket,
     int sentLength;
 
 #ifdef NO_MSGAPI
+    void* sendBuffer;
     size_t sendLength;
 
     if (bufferCount > 1)
@@ -580,10 +573,7 @@ enet_socket_send (ENetSocket socket,
             sendLength += buffers[i].dataLength;
         }
 
-        if (sendBufferSize < sendLength) {
-            sendBuffer = realloc(sendBuffer, sendLength);
-            sendBufferSize = sendLength;
-        }
+        sendBuffer = malloc (sendLength);
         if (sendBuffer == NULL)
           return -1;
 
@@ -603,6 +593,8 @@ enet_socket_send (ENetSocket socket,
     sentLength = sendto (socket, sendBuffer, sendLength, MSG_NOSIGNAL,
         (struct sockaddr *) & peerAddress -> address, peerAddress -> addressLength);
 
+    if (bufferCount > 1)
+      free(sendBuffer);
 #else
     struct msghdr msgHdr;
     char controlBufData[1024];
