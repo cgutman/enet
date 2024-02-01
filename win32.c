@@ -19,6 +19,14 @@ typedef UINT32 *PQOS_FLOWID;
 #define QOS_NON_ADAPTIVE_FLOW 0x00000002
 #endif
 
+// This is missing from MinGW headers
+#ifndef IN6ADDR_V4MAPPEDPREFIX_INIT
+#define IN6ADDR_V4MAPPEDPREFIX_INIT { \
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, \
+    0x00, 0x00, 0xff, 0xff, \
+}
+#endif
+
 static enet_uint32 timeBase = 0;
 
 #if !(defined(WINAPI_FAMILY) && WINAPI_FAMILY == WINAPI_FAMILY_APP)
