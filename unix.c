@@ -812,11 +812,13 @@ enet_socket_wait (ENetSocket socket, enet_uint32 * condition, enet_uint32 timeou
       pollSocket.events |= POLLIN;
 
 #if defined(__3DS__)
-    for (int i = 0; i < timeout; i++) {
-        pollCount = poll(& pollSocket, 1, 1); // need to do this on 3ds since poll will block even if socket is ready before
+    uint64_t poll_start = osGetTime();
+    for (uint64_t i = poll_start; (i - poll_start) < timeout; i = osGetTime()) {
+        pollCount = poll(& pollSocket, 1, 0); // need to do this on 3ds since poll will block even if socket is ready before
         if (pollCount) {
             break;
         }
+        svcSleepThread(1000);
     }
 #else
     pollCount = poll (& pollSocket, 1, timeout);
