@@ -455,7 +455,7 @@ enet_socket_set_option (ENetSocket socket, ENetSocketOption option, int value)
             // iOS/macOS
             value = value ? NET_SERVICE_TYPE_VO : NET_SERVICE_TYPE_BE;
             result = setsockopt (socket, SOL_SOCKET, SO_NET_SERVICE_TYPE, (char *) & value, sizeof (int));
-#else
+#endif
 #ifdef IP_TOS
             // UNIX - IPv4
             value = value ? 46 << 2 : 0; // DSCP: Expedited Forwarding
@@ -471,7 +471,6 @@ enet_socket_set_option (ENetSocket socket, ENetSocketOption option, int value)
             value = value ? 6 : 0; // Max priority without NET_CAP_ADMIN
             result = setsockopt (socket, SOL_SOCKET, SO_PRIORITY, (char *) & value, sizeof (int));
 #endif
-#endif /* SO_NET_SERVICE_TYPE */
             break;
 
         case ENET_SOCKOPT_TTL:
