@@ -8,7 +8,6 @@
 #include "enet/enet.h"
 #include <windows.h>
 #include <Mswsock.h>
-#include <VersionHelpers.h>
 #ifndef HAS_QOS_FLOWID
 typedef UINT32 QOS_FLOWID;
 #endif
@@ -24,6 +23,9 @@ static enet_uint32 timeBase = 0;
 
 #if !(defined(WINAPI_FAMILY) && WINAPI_FAMILY == WINAPI_FAMILY_APP)
 # define HAS_QWAVE
+# include <VersionHelpers.h>
+#else
+# define IsWindows10OrGreater() TRUE
 #endif
 
 #ifdef HAS_QWAVE
@@ -31,7 +33,6 @@ static enet_uint32 timeBase = 0;
 static HANDLE qosHandle = INVALID_HANDLE_VALUE;
 static QOS_FLOWID qosFlowId;
 static BOOL qosAddedFlow;
-static BOOL enableEcn;
 
 static HMODULE QwaveLibraryHandle;
 
@@ -41,7 +42,8 @@ BOOL (WINAPI *pfnQOSAddSocketToFlow)(HANDLE QOSHandle, SOCKET Socket, PSOCKADDR 
 
 #endif
 
-LPFN_WSARECVMSG pfnWSARecvMsg;
+static BOOL enableEcn;
+static LPFN_WSARECVMSG pfnWSARecvMsg;
 
 
 int
