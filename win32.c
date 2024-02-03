@@ -8,6 +8,7 @@
 #include "enet/enet.h"
 #include <windows.h>
 #include <Mswsock.h>
+#include <VersionHelpers.h>
 #ifndef HAS_QOS_FLOWID
 typedef UINT32 QOS_FLOWID;
 #endif
@@ -17,14 +18,6 @@ typedef UINT32 *PQOS_FLOWID;
 #include <qos2.h>
 #ifndef QOS_NON_ADAPTIVE_FLOW
 #define QOS_NON_ADAPTIVE_FLOW 0x00000002
-#endif
-
-// This is missing from MinGW headers
-#ifndef IN6ADDR_V4MAPPEDPREFIX_INIT
-#define IN6ADDR_V4MAPPEDPREFIX_INIT { \
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, \
-    0x00, 0x00, 0xff, 0xff, \
-}
 #endif
 
 static enet_uint32 timeBase = 0;
@@ -38,6 +31,7 @@ static enet_uint32 timeBase = 0;
 static HANDLE qosHandle = INVALID_HANDLE_VALUE;
 static QOS_FLOWID qosFlowId;
 static BOOL qosAddedFlow;
+static BOOL enableEcn;
 
 static HMODULE QwaveLibraryHandle;
 
@@ -93,6 +87,7 @@ enet_deinitialize (void)
 #ifdef HAS_QWAVE
     qosAddedFlow = FALSE;
     qosFlowId = 0;
+    enableEcn = FALSE;
 
     if (qosHandle != INVALID_HANDLE_VALUE)
     {
@@ -330,6 +325,9 @@ enet_socket_set_option (ENetSocket socket, ENetSocketOption option, int value)
 
         case ENET_SOCKOPT_QOS:
         {
+            // Enable ECN marking on Windows 10 if QOS is enabled
+            enableEcn = value != 0 && IsWindows10OrGreater();
+
 #ifdef HAS_QWAVE
             if (value)
             {
@@ -440,14 +438,14 @@ enet_socket_send (ENetSocket socket,
     DWORD sentLength;
     WSAMSG msg = { 0 };
     char controlBufData[1024];
+    PWSACMSGHDR chdr = NULL;
+
 #ifdef HAS_QWAVE
     if (!qosAddedFlow && qosHandle != INVALID_HANDLE_VALUE)
     {
-        static const char V4_MAPPED_V6_PREFIX[] = IN6ADDR_V4MAPPEDPREFIX_INIT;
-
         BOOL isV4MappedV6Addr =
             peerAddress->address.ss_family == AF_INET6 &&
-            !memcmp(&((PSOCKADDR_IN6)&peerAddress->address)->sin6_addr, V4_MAPPED_V6_PREFIX, sizeof(V4_MAPPED_V6_PREFIX));
+            IN6_IS_ADDR_V4MAPPED(&((PSOCKADDR_IN6)&peerAddress->address)->sin6_addr);
 
         // qWAVE doesn't properly support IPv4-mapped IPv6 addresses, nor does it
         // correctly support IPv4 addresses on a dual-stack socket (despite MSDN's
@@ -478,8 +476,8 @@ enet_socket_send (ENetSocket socket,
     }
 #endif
 
-    msg.name = peerAddress != NULL ? (struct sockaddr *) & peerAddress -> address : NULL;
-    msg.namelen = peerAddress != NULL ? peerAddress -> addressLength : 0;
+    msg.name = (struct sockaddr *) & peerAddress -> address;
+    msg.namelen = peerAddress -> addressLength;
     msg.lpBuffers = (LPWSABUF) buffers;
     msg.dwBufferCount = (DWORD) bufferCount;
 
@@ -494,9 +492,14 @@ enet_socket_send (ENetSocket socket,
             pktInfo.ipi_ifindex = 0; // Unspecified
 
             msg.Control.buf = controlBufData;
-            msg.Control.len = WSA_CMSG_SPACE(sizeof(pktInfo));
+            msg.Control.len += WSA_CMSG_SPACE(sizeof(pktInfo));
+            if (chdr == NULL) {
+                chdr = WSA_CMSG_FIRSTHDR(&msg);
+            }
+            else {
+                chdr = WSA_CMSG_NXTHDR(&msg, chdr);
+            }
 
-            PWSACMSGHDR chdr = WSA_CMSG_FIRSTHDR(&msg);
             chdr->cmsg_level = IPPROTO_IP;
             chdr->cmsg_type = IP_PKTINFO;
             chdr->cmsg_len = WSA_CMSG_LEN(sizeof(pktInfo));
@@ -509,14 +512,48 @@ enet_socket_send (ENetSocket socket,
             pktInfo.ipi6_ifindex = 0; // Unspecified
 
             msg.Control.buf = controlBufData;
-            msg.Control.len = WSA_CMSG_SPACE(sizeof(pktInfo));
+            msg.Control.len += WSA_CMSG_SPACE(sizeof(pktInfo));
+            if (chdr == NULL) {
+                chdr = WSA_CMSG_FIRSTHDR(&msg);
+            }
+            else {
+                chdr = WSA_CMSG_NXTHDR(&msg, chdr);
+            }
 
-            PWSACMSGHDR chdr = WSA_CMSG_FIRSTHDR(&msg);
             chdr->cmsg_level = IPPROTO_IPV6;
             chdr->cmsg_type = IPV6_PKTINFO;
             chdr->cmsg_len = WSA_CMSG_LEN(sizeof(pktInfo));
             memcpy(WSA_CMSG_DATA(chdr), &pktInfo, sizeof(pktInfo));
         }
+    }
+
+    // This is a bit of a hack because it's not really per-socket or
+    // per-destination, but it is fine for our current usage of ENet
+    // in Moonlight and Sunshine where only a single socket is used.
+    if (enableEcn) {
+        BOOL isV4MappedV6Addr =
+            peerAddress->address.ss_family == AF_INET6 &&
+            IN6_IS_ADDR_V4MAPPED(&((PSOCKADDR_IN6)&peerAddress->address)->sin6_addr);
+
+        msg.Control.buf = controlBufData;
+        msg.Control.len += WSA_CMSG_SPACE(sizeof(INT));
+        if (chdr == NULL) {
+            chdr = WSA_CMSG_FIRSTHDR(&msg);
+        }
+        else {
+            chdr = WSA_CMSG_NXTHDR(&msg, chdr);
+        }
+
+        if (peerAddress->address.ss_family == AF_INET || isV4MappedV6Addr) {
+            chdr->cmsg_level = IPPROTO_IP;
+            chdr->cmsg_type = IP_ECN;
+        }
+        else {
+            chdr->cmsg_level = IPPROTO_IPV6;
+            chdr->cmsg_type = IPV6_ECN;
+        }
+        chdr->cmsg_len = WSA_CMSG_LEN(sizeof(INT));
+        *(PINT)WSA_CMSG_DATA(chdr) = 0x01; // ECT(1) (L4S)
     }
 
     if (WSASendMsg (socket,
