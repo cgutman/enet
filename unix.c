@@ -327,12 +327,12 @@ enet_socket_set_option (ENetSocket socket, ENetSocketOption option, int value)
 #else
 #ifdef IP_TOS
             // UNIX - IPv4
-            value = value ? 46 << 2 : 0; // DSCP: Expedited Forwarding
+            value = value ? (46 << 2 | 0x01) : 0; // DSCP: Expedited Forwarding + ECT(1) (L4S)
             result = setsockopt (socket, IPPROTO_IP, IP_TOS, (char *) & value, sizeof (int));
 #endif
 #ifdef IPV6_TCLASS
             // UNIX - IPv6
-            value = value ? 46 << 2: 0; // DSCP: Expedited Forwarding
+            value = value ? (46 << 2 | 0x01): 0; // DSCP: Expedited Forwarding + ECT(1) (L4S)
             result = setsockopt (socket, IPPROTO_IPV6, IPV6_TCLASS, (char *) & value, sizeof (int));
 #endif
 #ifdef SO_PRIORITY
