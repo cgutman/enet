@@ -200,7 +200,11 @@ typedef enum _ENetPeerState
 
 enum
 {
-#ifdef __3DS__
+#if defined(__WIIU__)
+   ENET_HOST_RECEIVE_BUFFER_SIZE          = 256 * 1024,
+   // Send buffer size is limited since it cannot use userbuffers
+   ENET_HOST_SEND_BUFFER_SIZE             = 0x10000 - 1,
+#elif defined(__3DS__)
    ENET_HOST_RECEIVE_BUFFER_SIZE          = 0x20000,
    ENET_HOST_SEND_BUFFER_SIZE             = 0x20000,
 #else
