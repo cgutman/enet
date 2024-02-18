@@ -393,6 +393,14 @@ enet_socket_create (int af, ENetSocketType type)
     }
 #endif
 
+#ifdef __WIIU__
+    {
+        // Enable usage of userbuffers on Wii U
+        int on = 1;
+        setsockopt(sock, SOL_SOCKET, SO_RUSRBUF, (char *)&on, sizeof(on));
+    }
+#endif
+
     return sock;
 }
 
