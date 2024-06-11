@@ -143,6 +143,10 @@
 #ifndef NO_MSGAPI
 #define NO_MSGAPI 1
 #endif
+#elif defined(__HAIKU__)
+#ifndef HAS_POLL
+#define HAS_POLL 1
+#endif
 #else
 #ifndef HAS_IOCTL
 #define HAS_IOCTL 1
