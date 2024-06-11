@@ -57,11 +57,11 @@
 #define HAS_GETNAMEINFO 1
 #endif
 #elif defined(__vita__)
-#ifdef HAS_POLL
-#undef HAS_POLL
+#ifndef HAS_POLL
+#define HAS_POLL
 #endif
-#ifdef HAS_FCNTL
-#undef HAS_FCNTL
+#ifndef HAS_FCNTL
+#define HAS_FCNTL
 #endif
 #ifdef HAS_IOCTL
 #undef HAS_IOCTL
@@ -72,8 +72,8 @@
 #ifndef HAS_INET_NTOP
 #define HAS_INET_NTOP 1
 #endif
-#ifdef HAS_MSGHDR_FLAGS
-#undef HAS_MSGHDR_FLAGS
+#ifndef HAS_MSGHDR_FLAGS
+#define HAS_MSGHDR_FLAGS 1
 #endif
 #ifndef HAS_SOCKLEN_T
 #define HAS_SOCKLEN_T 1
@@ -155,6 +155,7 @@
 #define HAS_POLL 1
 #endif
 #endif
+
 
 #ifdef HAS_FCNTL
 #include <fcntl.h>
@@ -750,9 +751,13 @@ enet_socket_receive (ENetSocket socket,
 
     // Retrieve the local address that this traffic was received on
     // to ensure we respond from the correct address/interface.
+
     if (localAddress != NULL) {
+#ifndef __vita__
         for (struct cmsghdr *chdr = CMSG_FIRSTHDR(&msgHdr); chdr != NULL; chdr = CMSG_NXTHDR(&msgHdr, chdr)) {
+#endif
 #ifdef IP_PKTINFO
+        
             if (chdr->cmsg_level == IPPROTO_IP && chdr->cmsg_type == IP_PKTINFO) {
                 struct sockaddr_in *localAddr = (struct sockaddr_in*)&localAddress->address;
 
@@ -773,8 +778,9 @@ enet_socket_receive (ENetSocket socket,
                 localAddress->addressLength = sizeof(*localAddr);
                 break;
             }
- #endif
+
         }
+#endif
     }
 
     if (peerAddress != NULL) {
