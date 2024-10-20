@@ -1749,6 +1749,22 @@ enet_protocol_send_outgoing_commands (ENetHost * host, ENetEvent * event, int ch
     return 0;
 }
 
+static enet_uint32
+enet_protocol_compute_wait_timeout(ENetHost * host, enet_uint32 timeout)
+{
+    for (ENetPeer * currentPeer = host -> peers;
+         currentPeer < & host -> peers [host -> peerCount];
+         ++ currentPeer)
+    {
+        if (! ENET_TIME_LESS (currentPeer -> nextTimeout, host -> serviceTime)) {
+            timeout = ENET_MIN (timeout, ENET_TIME_DIFFERENCE (currentPeer -> nextTimeout, host -> serviceTime) + 1);
+            timeout = ENET_MIN (timeout, currentPeer -> pingInterval);
+        }
+    }
+
+    return timeout;
+}
+
 /** Sends any queued packets on the host specified to its designated peers.
 
     @param host   host to flush
@@ -1913,7 +1929,9 @@ enet_host_service (ENetHost * host, ENetEvent * event, enet_uint32 timeout)
 
           waitCondition = ENET_SOCKET_WAIT_RECEIVE | ENET_SOCKET_WAIT_INTERRUPT;
 
-          if (enet_socket_wait (host -> socket, & waitCondition, ENET_TIME_DIFFERENCE (timeout, host -> serviceTime) / 10) != 0)
+          if (enet_socket_wait (host -> socket, & waitCondition,
+                                enet_protocol_compute_wait_timeout (host,
+                                                                    ENET_TIME_DIFFERENCE (timeout, host -> serviceTime))) != 0)
             return -1;
        }
        while (waitCondition & ENET_SOCKET_WAIT_INTERRUPT);
