@@ -1758,6 +1758,17 @@ enet_protocol_compute_wait_timeout(ENetHost * host, enet_uint32 timeout)
     {
         if (! ENET_TIME_LESS (currentPeer -> nextTimeout, host -> serviceTime)) {
             timeout = ENET_MIN (timeout, ENET_TIME_DIFFERENCE (currentPeer -> nextTimeout, host -> serviceTime) + 1);
+        }
+
+        if (currentPeer -> lastReceiveTime) {
+            enet_uint32 timeSinceLastRecv = ENET_TIME_DIFFERENCE (host -> serviceTime, currentPeer -> lastReceiveTime);
+            if (timeSinceLastRecv >= currentPeer -> pingInterval) {
+                // Ping is due now for this peer
+                return 0;
+            } else {
+                timeout = ENET_MIN (timeout, currentPeer -> pingInterval - timeSinceLastRecv);
+            }
+        } else {
             timeout = ENET_MIN (timeout, currentPeer -> pingInterval);
         }
     }
