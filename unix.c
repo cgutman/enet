@@ -380,6 +380,12 @@ enet_socket_create (int af, ENetSocketType type)
         int on = 1;
         setsockopt(sock, IPPROTO_IP, IP_PKTINFO, (char *)&on, sizeof(on));
     }
+#elif defined(IP_RECVDSTADDR)
+    // FreeBSD uses IP_RECVDSTADDR instead of IP_PKTINFO when struct in_pktinfo is not available
+    {
+        int on = 1;
+        setsockopt(sock, IPPROTO_IP, IP_RECVDSTADDR, (char *)&on, sizeof(on));
+    }
 #endif
 
 #ifdef IPV6_RECVPKTINFO
@@ -633,6 +639,20 @@ enet_socket_send (ENetSocket socket,
             chdr->cmsg_len = CMSG_LEN(sizeof(pktInfo));
             memcpy(CMSG_DATA(chdr), &pktInfo, sizeof(pktInfo));
         }
+#elif defined(IP_SENDSRCADDR)
+        // FreeBSD uses IP_SENDSRCADDR with struct in_addr instead of IP_PKTINFO
+        if (localAddress->address.ss_family == AF_INET) {
+            struct in_addr srcAddr = ((struct sockaddr_in*)&localAddress->address)->sin_addr;
+
+            msgHdr.msg_control = controlBufData;
+            msgHdr.msg_controllen = CMSG_SPACE(sizeof(srcAddr));
+
+            struct cmsghdr *chdr = CMSG_FIRSTHDR(&msgHdr);
+            chdr->cmsg_level = IPPROTO_IP;
+            chdr->cmsg_type = IP_SENDSRCADDR;
+            chdr->cmsg_len = CMSG_LEN(sizeof(srcAddr));
+            memcpy(CMSG_DATA(chdr), &srcAddr, sizeof(srcAddr));
+        }
 #endif
 #ifdef IPV6_PKTINFO
         if (localAddress->address.ss_family == AF_INET6) {
@@ -750,6 +770,17 @@ enet_socket_receive (ENetSocket socket,
 
                 localAddr->sin_family = AF_INET;
                 localAddr->sin_addr = ((struct in_pktinfo*)CMSG_DATA(chdr))->ipi_addr;
+
+                localAddress->addressLength = sizeof(*localAddr);
+                break;
+            }
+#elif defined(IP_RECVDSTADDR)
+            // FreeBSD uses IP_RECVDSTADDR with struct in_addr instead of IP_PKTINFO
+            if (chdr->cmsg_level == IPPROTO_IP && chdr->cmsg_type == IP_RECVDSTADDR) {
+                struct sockaddr_in *localAddr = (struct sockaddr_in*)&localAddress->address;
+
+                localAddr->sin_family = AF_INET;
+                localAddr->sin_addr = *((struct in_addr*)CMSG_DATA(chdr));
 
                 localAddress->addressLength = sizeof(*localAddr);
                 break;
