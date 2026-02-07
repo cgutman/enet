@@ -1731,7 +1731,9 @@ enet_protocol_send_outgoing_commands (ENetHost * host, ENetEvent * event, int ch
             enet_socket_set_option (host -> socket, ENET_SOCKOPT_QOS, 0);
         }
 
-        sentLength = enet_socket_send (host -> socket, & currentPeer -> address, & currentPeer -> localAddress, host -> buffers, host -> bufferCount);
+        sentLength = enet_socket_send (host -> socket, & currentPeer -> address,
+                                       host -> wildcardBind ? (& currentPeer -> localAddress) : NULL,
+                                       host -> buffers, host -> bufferCount);
 
         enet_protocol_remove_sent_unreliable_commands (currentPeer, & sentUnreliableCommands);
 

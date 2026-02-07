@@ -270,6 +270,30 @@ enet_address_equal (ENetAddress * address1, ENetAddress * address2)
 }
 
 int
+enet_address_wildcard (const ENetAddress * address)
+{
+    switch (address -> address.ss_family)
+    {
+    case AF_INET:
+    {
+        struct sockaddr_in *sin = (struct sockaddr_in *) & address -> address;
+        return sin -> sin_addr.s_addr == INADDR_ANY;
+    }
+#ifdef AF_INET6
+    case AF_INET6:
+    {
+        struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) & address -> address;
+        return ! memcmp (& sin6 -> sin6_addr, & in6addr_any, sizeof (in6addr_any));
+    }
+#endif
+    default:
+    {
+        return 0;
+    }
+    }
+}
+
+int
 enet_address_set_port (ENetAddress * address, enet_uint16 port)
 {
     if (address -> address.ss_family == AF_INET)
