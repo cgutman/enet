@@ -133,6 +133,8 @@
 #define NO_MSGAPI 1
 #endif
 #elif defined(__3DS__)
+#include <3ds/os.h>
+#include <3ds/svc.h>
 #ifdef AF_INET6
 #undef AF_INET6
 #endif
