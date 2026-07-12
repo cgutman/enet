@@ -133,8 +133,8 @@
 #define NO_MSGAPI 1
 #endif
 #elif defined(__3DS__)
-extern uint64_t osGetTime(void);
-extern void svcSleepThread(int64_t ns);
+#include <3ds/os.h>
+#include <3ds/svc.h>
 #ifdef AF_INET6
 #undef AF_INET6
 #endif
